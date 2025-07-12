@@ -26,6 +26,8 @@ class BookController extends Controller
             return [
                 'title' => $book->title,
                 'description' => $book->description,
+                'status' => $book->status,
+                'categories' => $book->categories->pluck('name')->toArray(),
                 'authors' => $book->authors->pluck('name')->toArray(),
                 'published_date' => $book->published_date ? $book->published_date->format('Y-m-d') : null,
             ];
@@ -58,6 +60,24 @@ class BookController extends Controller
             $authorId = $request->input('author_id');
             $query->whereHas('authors', function ($q) use ($authorId) {
                 $q->where('id', $authorId);
+            });
+        }
+
+        if ($request->has('status')) {
+            $query->where('status', 'like', '%' . $request->input('status') . '%');
+        }
+
+        if ($request->has('category')) {
+            $categoryName = $request->input('category');
+            $query->whereHas('categories', function ($q) use ($categoryName) {
+                $q->where('name', 'like', '%' . $categoryName . '%');
+            });
+        }
+
+        if ($request->has('category_id')) {
+            $categoryId = $request->input('category_id');
+            $query->whereHas('authors', function ($q) use ($categoryId) {
+                $q->where('id', $categoryId);
             });
         }
     }

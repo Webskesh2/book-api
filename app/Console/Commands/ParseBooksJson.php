@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Category;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use App\Models\Book;
@@ -9,8 +10,6 @@ use App\Models\Author;
 
 class ParseBooksJson extends Command
 {
-    private const BOOKS_URL = 'https://raw.githubusercontent.com/bvaughn/infinite-list-reflow-examples/refs/heads/master/books.json';
-
     /**
      * The name and signature of the console command.
      *
@@ -66,15 +65,19 @@ class ParseBooksJson extends Command
                 continue;
             }
 
+            $date = date('Y-m-d', strtotime($bookData['publishedDate']['$date']));
+
+            /** @var Book $book */
             $book = Book::firstOrNew(['isbn' => $isbn]);
             $book->title = $bookData['title'] ?? 'N/A';
-            $book->description = $bookData['description'] ?? null;
-            $book->published_date = isset($bookData['publishedDate']['$date'])
-                ? date('Y-m-d', strtotime($bookData['publishedDate']['$date']))
-                : null;
-
+            $book->description = $bookData['shortDescription'] ?? null;
+            $book->status = $bookData['status'] ?? null;
+            $book->published_date = isset($bookData['publishedDate']['$date']) ? $date : null;
             $book->save();
+
             $this->handleAuthors($bookData, $book);
+            $this->handleCategories($bookData, $book);
+
             $this->info("Processed book: {$book->title} (ISBN: {$book->isbn})");
         }
     }
@@ -86,22 +89,50 @@ class ParseBooksJson extends Command
      */
     private function handleAuthors(array $bookData, Book $book): void
     {
-        if (isset($bookData['authors']) && is_array($bookData['authors'])) {
-            $authorIds = [];
-            foreach ($bookData['authors'] as $authorName) {
-                $authorName = trim($authorName);
-                if (empty($authorName)) {
-                    $this->warn("Skipping empty author name for book: {$book->title} (ISBN: {$book->isbn})");
-                    continue;
-                }
+        if (!isset($bookData['authors']) || !is_array($bookData['authors'])) {
+            return;
+        }
 
-                $author = Author::firstOrCreate(['name' => $authorName]);
-                $authorIds[] = $author->id;
+        $authorIds = [];
+        foreach ($bookData['authors'] as $authorName) {
+            $authorName = trim($authorName);
+            if (empty($authorName)) {
+                $this->warn("Skipping empty author name for book: {$book->title} (ISBN: {$book->isbn})");
+                continue;
             }
 
-            $book->authors()->sync($authorIds); // Sync authors to handle additions/removals
-        } else {
-            $book->authors()->detach(); // Detach all authors if none provided
+            /** @var Author $author */
+            $author = Author::firstOrCreate(['name' => $authorName]);
+            $authorIds[] = $author->id;
         }
+
+        $book->authors()->sync($authorIds);
+    }
+
+    /**
+     * @param array $bookData
+     * @param Book $book
+     * @return void
+     */
+    private function handleCategories(array $bookData, Book $book): void
+    {
+        if (!isset($bookData['categories']) || !is_array($bookData['categories'])) {
+            return;
+        }
+
+        $categoryIds = [];
+        foreach ($bookData['categories'] as $categoryName) {
+            $categoryName = trim($categoryName);
+            if (empty($categoryName)) {
+                $this->warn("Skipping empty category name for book: {$book->title} (ISBN: {$book->isbn})");
+                continue;
+            }
+
+            /** @var Category $category */
+            $category = Category::firstOrCreate(['name' => $categoryName]);
+            $categoryIds[] = $category->id;
+        }
+
+        $book->categories()->sync($categoryIds);
     }
 }
