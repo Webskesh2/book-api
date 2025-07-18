@@ -3,11 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Author;
+use App\Repositories\AuthorRepositoryInterface;
 use Illuminate\Http\Request;
+use App\Http\Resources\AuthorResource;
 
 class AuthorController extends Controller
 {
+    protected AuthorRepositoryInterface $authorRepository;
+
+    public function __construct(AuthorRepositoryInterface $authorRepository)
+    {
+        $this->authorRepository = $authorRepository;
+    }
+
     /**
      * Get a list of authors with the number of books.
      * Response: author name + number of books.
@@ -15,19 +23,6 @@ class AuthorController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Author::withCount('books');
-
-        if ($request->has('name')) {
-            $query->where('name', 'like', '%' . $request->input('name') . '%');
-        }
-
-        $authors = $query->paginate(config('constants.pagination.authors_per_page'));
-
-        return response()->json($authors->map(function ($author) {
-            return [
-                'name' => $author->name,
-                'book_count' => $author->books_count,
-            ];
-        }));
+        return AuthorResource::collection($this->authorRepository->getAllAuthors($request->query('search')));
     }
 }

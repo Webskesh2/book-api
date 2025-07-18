@@ -2,11 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Author;
+use App\Models\Book;
 use App\Models\Category;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
-use App\Models\Book;
-use App\Models\Author;
 
 class ParseBooksJson extends Command
 {
@@ -34,7 +34,7 @@ class ParseBooksJson extends Command
             $response = Http::get(config('constants.data_sources.books_json_url'));
             $booksData = $response->json();
         } catch (\Exception $e) {
-            $this->error('Failed to fetch JSON data: ' . $e->getMessage());
+            $this->error('Failed to fetch JSON data: '.$e->getMessage());
 
             return Command::FAILURE;
         }
@@ -52,20 +52,17 @@ class ParseBooksJson extends Command
         return Command::SUCCESS;
     }
 
-    /**
-     * @param array $booksData
-     * @return void
-     */
     private function parseBooks(array $booksData): void
     {
         foreach ($booksData as $bookData) {
             $isbn = $bookData['isbn'] ?? null;
-            if (!$isbn) {
-                $this->warn('Skipping book with missing ISBN: ' . json_encode($bookData));
+            if (! $isbn) {
+                $this->warn('Skipping book with missing ISBN: '.json_encode($bookData));
+
                 continue;
             }
 
-            $date = date('Y-m-d', strtotime($bookData['publishedDate']['$date']));
+            $date = date('Y-m-d', strtotime($bookData['publishedDate']['$date'] ?? null));
 
             /** @var Book $book */
             $book = Book::firstOrNew(['isbn' => $isbn]);
@@ -82,14 +79,9 @@ class ParseBooksJson extends Command
         }
     }
 
-    /**
-     * @param array $bookData
-     * @param Book $book
-     * @return void
-     */
     private function handleAuthors(array $bookData, Book $book): void
     {
-        if (!isset($bookData['authors']) || !is_array($bookData['authors'])) {
+        if (! isset($bookData['authors']) || ! is_array($bookData['authors'])) {
             return;
         }
 
@@ -98,6 +90,7 @@ class ParseBooksJson extends Command
             $authorName = trim($authorName);
             if (empty($authorName)) {
                 $this->warn("Skipping empty author name for book: {$book->title} (ISBN: {$book->isbn})");
+
                 continue;
             }
 
@@ -109,14 +102,9 @@ class ParseBooksJson extends Command
         $book->authors()->sync($authorIds);
     }
 
-    /**
-     * @param array $bookData
-     * @param Book $book
-     * @return void
-     */
     private function handleCategories(array $bookData, Book $book): void
     {
-        if (!isset($bookData['categories']) || !is_array($bookData['categories'])) {
+        if (! isset($bookData['categories']) || ! is_array($bookData['categories'])) {
             return;
         }
 
@@ -125,6 +113,7 @@ class ParseBooksJson extends Command
             $categoryName = trim($categoryName);
             if (empty($categoryName)) {
                 $this->warn("Skipping empty category name for book: {$book->title} (ISBN: {$book->isbn})");
+
                 continue;
             }
 
