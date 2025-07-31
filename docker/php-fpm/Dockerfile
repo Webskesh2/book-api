@@ -14,8 +14,6 @@ COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
 WORKDIR /var/www/html
 
-COPY .env.example ./.env
-
 ARG UID=1000
 RUN adduser -u $UID -D -g '' appuser
 RUN chown -R appuser:appuser /var/www/html
